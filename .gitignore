@@ -1,0 +1,9 @@
+# Build directories
+obj/
+bin/
+
+# macOS specific
+.DS_Store
+
+# Debugging symbols (macOS creates these for dSYM bundles)
+*.dSYM/
