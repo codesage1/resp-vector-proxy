@@ -61,7 +61,7 @@ resp_status resp_parse(const char *buf, size_t len, size_t *consumed, resp_value
             if(!*out) return RESP_PROTO_ERR;
 
             (*out)->type = RESP_SIMPLE;
-            (*out)->as.str.len = line_len + 1;
+            (*out)->as.str.len = line_len;
             (*out)->as.str.data = malloc(line_len+1);
 
             memcpy((*out)->as.str.data, text_start , line_len);
@@ -114,16 +114,22 @@ resp_status resp_parse(const char *buf, size_t len, size_t *consumed, resp_value
             
             *out = malloc(sizeof(resp_value));
             if(*out == NULL) return RESP_PROTO_ERR;
+            
+            size_t header_bytes = 1 + line_len + 2; // $N\r\n
 
             // FIX 1: Use long long so -1 doesn't become 18 quintillion
             long long payload_len = strtoll(text_start, NULL, 10);
-            size_t header_bytes = 1 + line_len + 2; // $N\r\n
-
+            
             // FIX 2: Exact check for Null String
             if(payload_len == -1) {
                 (*out)->type = RESP_NULL;
                 *consumed = header_bytes;
                 return RESP_OK;
+            }
+            if (payload_len < -1 || payload_len > (512 * 1024 * 1024)) {
+                free(*out);
+                *out = NULL;
+                return RESP_PROTO_ERR;
             }
             
             (*out)->type = RESP_BULK;
@@ -197,6 +203,7 @@ resp_status resp_parse(const char *buf, size_t len, size_t *consumed, resp_value
             }
 
             resp_value **items = n ? malloc(n * sizeof(*items)) : NULL;
+
             if(n && !items) {
                 free(value);
                 return RESP_PROTO_ERR;
@@ -257,7 +264,13 @@ static void writer_append(resp_writer *w, const char *data, size_t len) {
     if (w->len + len > w->cap) {
         w->cap = (w->cap == 0) ? 64 : w->cap;
         while (w->len + len > w->cap) w->cap *= 2;
-        w->buf = realloc(w->buf, w->cap);
+        void* temp = realloc(w->buf, w->cap);
+        if (!temp) {
+            // Handle memory allocation failure
+            fprintf(stderr, "Memory allocation failed in writer_append\n");
+            exit(EXIT_FAILURE);
+        }
+        w->buf = temp;
     }
     memcpy(w->buf + w->len, data, len);
     w->len += len;
