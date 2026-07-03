@@ -56,16 +56,6 @@ void run_torture_loop(const char *fixture_path) {
     free(buf);
 }
 
-int main() {
-    run_torture_loop("fixtures/cmd_ping.bin");
-    run_torture_loop("fixtures/cmd_ftknn.bin"); // The Poison Boss
-    run_torture_loop("fixtures/reply_nested.bin");
-    
-    printf("All Torture Loops Passed!\n");
-    return 0;
-}
-
-
 /* Recursively write a parsed tree back into a writer */
 void serialize_tree(resp_writer *w, resp_value *v) {
     if (!v) return;
@@ -82,4 +72,13 @@ void serialize_tree(resp_writer *w, resp_value *v) {
             }
             break;
     }
+}
+
+int main() {
+    run_torture_loop("fixtures/cmd_ping.bin");
+    run_torture_loop("fixtures/cmd_ftknn.bin"); // The Poison Boss
+    run_torture_loop("fixtures/reply_nested.bin");
+    
+    printf("All Torture Loops Passed!\n");
+    return 0;
 }

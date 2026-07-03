@@ -1,0 +1,3 @@
+# Binary-Safe RESP2 Codec
+
+This repository contains a from-scratch, binary-safe REdis Serialization Protocol (RESP2) parser and serializer written in pure C. Built as a foundational exercise in network programming and manual memory management, the library translates raw TCP byte streams into a dynamic, recursive Abstract Syntax Tree (AST) and back again. It features strict boundary checking, robust handling of TCP fragmentation via partial reads, and zero-leak memory management validated through AddressSanitizer. The primary objective of this project was to master binary-safe data extraction, recursive data structures, and the rigorous testing methodologies required to build enterprise-grade network infrastructure.
