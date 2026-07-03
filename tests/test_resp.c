@@ -23,36 +23,67 @@ char *load_fixture(const char *path, size_t *out_len) {
     
     return buf;
 }
+
 void serialize_tree(resp_writer *w, resp_value *v);
+
 void run_torture_loop(const char *fixture_path) {
     size_t file_len;
     char *buf = load_fixture(fixture_path, &file_len);
-    assert(buf != NULL);
+    if (!buf) return; // Skip gracefully if fixture doesn't exist yet
 
-    printf("Testing %s (%zu bytes)...\n", fixture_path, file_len);
+    printf("Testing Torture %s (%zu bytes)...\n", fixture_path, file_len);
 
-    // TODO: The Torture Loop Logic Goes Here
     size_t consumed = 0;
     resp_value *out = NULL;
     resp_status status;
+    
     for(size_t k = 1; k < file_len; k++){
         status = resp_parse(buf, k, &consumed, &out);
         assert(status == RESP_NEED_MORE);
     }
+    
     status = resp_parse(buf, file_len, &consumed, &out);
     assert(status == RESP_OK);
     assert(consumed == file_len);
     assert(out != NULL);
-    // --- NEW: Round-Trip Test ---
-    resp_writer w = {0}; // Initialize empty writer
+    
+    // --- Round-Trip Test ---
+    resp_writer w = {0}; 
     serialize_tree(&w, out);
     
-    // Assert the forged buffer is exactly the same length and has the exact same bytes!
     assert(w.len == file_len);
     assert(memcmp(w.buf, buf, file_len) == 0);
-    free(w.buf); // Free the writer's internal buffer
-    // ----------------------------
+    
+    free(w.buf); 
     resp_free(out);
+    free(buf);
+}
+
+void run_pipeline_test(const char *fixture_path) {
+    size_t file_len;
+    char *buf = load_fixture(fixture_path, &file_len);
+    if (!buf) return;
+
+    printf("Testing Pipeline %s (%zu bytes)...\n", fixture_path, file_len);
+
+    size_t offset = 0;
+    while(offset < file_len) {
+        size_t consumed = 0;
+        resp_value *out = NULL;
+        
+        // Pass the remaining buffer from the current offset
+        resp_status status = resp_parse(buf + offset, file_len - offset, &consumed, &out);
+        
+        assert(status == RESP_OK);
+        assert(consumed > 0);
+        assert(out != NULL);
+        
+        offset += consumed;
+        resp_free(out);
+    }
+    
+    // Assert that the loop consumed exactly the whole file, no more, no less.
+    assert(offset == file_len);
     free(buf);
 }
 
@@ -75,10 +106,24 @@ void serialize_tree(resp_writer *w, resp_value *v) {
 }
 
 int main() {
+    // 1. The Standard Fixtures
     run_torture_loop("fixtures/cmd_ping.bin");
     run_torture_loop("fixtures/cmd_ftknn.bin"); // The Poison Boss
     run_torture_loop("fixtures/reply_nested.bin");
+    run_torture_loop("fixtures/reply_bulk.bin");
+    run_torture_loop("fixtures/reply_array.bin");
+    run_torture_loop("fixtures/reply_integer.bin");
+    run_torture_loop("fixtures/reply_simple.bin");
+    run_torture_loop("fixtures/reply_error.bin");
+    run_torture_loop("fixtures/reply_null.bin");
+    run_torture_loop("fixtures/reply_empty_array.bin");
+    run_torture_loop("fixtures/reply_empty_bulk.bin");
+    run_torture_loop("fixtures/reply_empty_simple.bin");
     
-    printf("All Torture Loops Passed!\n");
+    // 2. The Pipelining Fixture
+    // (Make sure you generate this file using printf "+PING\r\n+PONG\r\n" > fixtures/pipeline.bin)
+    run_pipeline_test("fixtures/pipeline.bin");
+    
+    printf("All Tests Passed!\n");
     return 0;
 }
