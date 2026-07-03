@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <limits.h>
+#include <stdio.h>
 
 static const char *read_line(const char *buf, size_t len, size_t *line_len){
     const char *cr_ptr = (char *)memchr(buf, '\r', len);
@@ -257,7 +258,6 @@ resp_status resp_parse(const char *buf, size_t len, size_t *consumed, resp_value
     return RESP_OK;
 }
 
-
 void resp_free(resp_value *v){
     if(!v) return;
     if(v -> type == RESP_SIMPLE || v->type == RESP_ERROR || v->type == RESP_BULK){
@@ -270,3 +270,57 @@ void resp_free(resp_value *v){
     }
     free(v);
 }
+
+static void writer_append(resp_writer *w, const char *data, size_t len) {
+    if (w->len + len > w->cap) {
+        w->cap = (w->cap == 0) ? 64 : w->cap;
+        while (w->len + len > w->cap) w->cap *= 2;
+        w->buf = realloc(w->buf, w->cap);
+    }
+    memcpy(w->buf + w->len, data, len);
+    w->len += len;
+}
+
+
+int resp_write_simple(resp_writer *w, const char *s) {
+    writer_append(w, "+", 1);
+    writer_append(w, s, strlen(s));
+    writer_append(w, "\r\n", 2);
+    return RESP_OK;
+}
+
+int resp_write_error(resp_writer *w, const char *msg) {
+    writer_append(w, "-", 1);
+    writer_append(w, msg, strlen(msg));
+    writer_append(w, "\r\n", 2);
+    return RESP_OK;
+}
+
+int resp_write_integer(resp_writer *w, long long v) {
+    char buf[64];
+    int len = snprintf(buf, sizeof(buf), ":%lld\r\n", v);
+    writer_append(w, buf, len);
+    return RESP_OK;
+}
+
+int resp_write_null(resp_writer *w) {
+    writer_append(w, "$-1\r\n", 5);
+    return RESP_OK;
+}
+
+int resp_write_bulk(resp_writer *w, const char *data, size_t len) {
+    char header[64];
+    int len_header = snprintf(header, sizeof(header), "$%zu\r\n", len);
+    writer_append(w, header, len_header);
+    writer_append(w, data, len);
+    writer_append(w, "\r\n", 2);
+    return RESP_OK;
+}
+
+int resp_write_array_header(resp_writer *w, size_t n) {
+    char header[64];
+    int len_header = snprintf(header, sizeof(header), "*%zu\r\n", n);
+    writer_append(w, header, len_header);
+    return RESP_OK;
+}
+

@@ -21,4 +21,13 @@ typedef enum { RESP_OK, RESP_NEED_MORE, RESP_PROTO_ERR } resp_status;
 resp_status resp_parse(const char *buf, size_t len, size_t *consumed, resp_value **out);
 void resp_free(resp_value *v);
 
+typedef struct { char *buf; size_t len, cap; } resp_writer;
+
+int resp_write_simple (resp_writer *w, const char *s);
+int resp_write_error  (resp_writer *w, const char *msg);
+int resp_write_integer(resp_writer *w, long long v);
+int resp_write_bulk   (resp_writer *w, const char *data, size_t len);
+int resp_write_null   (resp_writer *w);                 /* $-1\r\n */
+int resp_write_array_header(resp_writer *w, size_t n);  /* then n values follow */
+
 #endif
