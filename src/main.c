@@ -6,7 +6,7 @@ int main(int argc, char *argv[]) {
     (void)argc;
     (void)argv;
 
-    printf("mini-wasp: Hello, World!\n");
+    printf("Hello, World!\n");
     
     return EXIT_SUCCESS;
 }

@@ -11,53 +11,36 @@ static const char *read_line(const char *buf, size_t len, size_t *line_len){
     *line_len = (cr_ptr - buf);
     return buf;
 }
-/*
- * Extracts a length-prefixed binary payload.
- *
- * buf: pointer to the start of the raw data (immediately after the $N\r\n)
- * remaining_len: total bytes left in the entire network buffer
- * payload_len: the number N we parsed from the prefix (can be -1 for Null string)
- * out_data: where to store the heap-allocated copy of the payload
- * bytes_consumed: how many bytes this function stepped over
- */
-static resp_status extract_bulk(const char *buf, size_t remaining_len, long long payload_len, 
-                                char **out_data, size_t *bytes_consumed) {
-    // 1. Handle the Null Bulk String (payload_len == -1). 
-    //    If so, set *out_data to NULL, *bytes_consumed to 0, and return RESP_OK.
+
+static resp_status extract_bulk(const char *buf, size_t remaining_len, long long payload_len, char **out_data, size_t *bytes_consumed) {
+
     if(payload_len == -1) {
         *out_data = NULL;
         *bytes_consumed = 0;
         return RESP_OK;
     }
 
-    // 2. The binary safety check: Do we have enough bytes in 'buf' to read 
-    //    the entire payload PLUS the trailing \r\n? 
-    //    If remaining_len < payload_len + 2, we must return RESP_NEED_MORE.
     if(remaining_len < (size_t)(payload_len + 2)) {
         return RESP_NEED_MORE;
     }
-    // 3. Allocate memory for the payload. 
-    //    Pro-tip: Allocate (payload_len + 1) and set the last byte to '\0'. 
-    //    RESP doesn't require null-terminators because it tracks length, but adding 
-    //    a hidden one makes debugging with printf() massively easier later.
+   
     *out_data = (char *)malloc(payload_len + 1);
     if(!*out_data) {
         return RESP_PROTO_ERR; // or handle memory allocation failure as needed
     }
     (*out_data)[payload_len] = '\0'; // Null-terminate for safety
 
-    // 4. Use memcpy() to blindly copy exactly 'payload_len' bytes from 'buf' to your new memory.
+    
     memcpy(*out_data, buf, payload_len);
 
-    // 5. Protocol Verification: Check if buf[payload_len] is '\r' and buf[payload_len + 1] is '\n'.
-    //    If they are not, the client lied about the length. Return RESP_PROTO_ERR.
+   
     if(buf[payload_len] != '\r' || buf[payload_len + 1] != '\n') {
         free(*out_data); // Free allocated memory before returning
         *out_data = NULL; // Avoid dangling pointer
         return RESP_PROTO_ERR;
     }
 
-    // 6. Set *bytes_consumed to (payload_len + 2) and return RESP_OK.
+    
     *bytes_consumed = payload_len + 2;
     return RESP_OK;
 }
@@ -69,7 +52,6 @@ resp_status resp_parse(const char *buf, size_t len, size_t *consumed, resp_value
 
     switch (prefix) {
         case '+': { // Simple String
-            // TODO: Implement Simple String logic using read_line
             size_t line_len;
 
             const char* text_start = read_line(buf + 1 , len - 1 , &line_len);
@@ -90,7 +72,7 @@ resp_status resp_parse(const char *buf, size_t len, size_t *consumed, resp_value
         }
             
         case '-': { // Error
-            // TODO: Implement Error logic (identical to Simple String)
+            
             size_t line_len;
 
             const char* text_start = read_line(buf+1 , len - 1, &line_len);
@@ -109,7 +91,7 @@ resp_status resp_parse(const char *buf, size_t len, size_t *consumed, resp_value
         }
             
         case ':': { // Integer
-            // TODO: Implement Integer logic
+            
             size_t line_len;
             const char* text_start = read_line(buf+1 , len - 1, &line_len);
             if(!text_start) return RESP_NEED_MORE;
@@ -164,11 +146,11 @@ resp_status resp_parse(const char *buf, size_t len, size_t *consumed, resp_value
             
             (*out)->as.str.len = payload_len;
             
-            // Do the final math combining the header and the payload steps
+           
             *consumed = header_bytes + extracted_bytes;
             return RESP_OK;
         }
-        case '*': { // Array
+        case '*': { 
             size_t array_line_len;
             const char *line = read_line(buf + 1, len - 1, &array_line_len);
             if(!line) return RESP_NEED_MORE;
