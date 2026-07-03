@@ -4,6 +4,8 @@
 #include <limits.h>
 #include <stdio.h>
 
+#define RESP_MAX_BULK_SIZE (512LL * 1024 * 1024) // 512 MB
+
 static const char *read_line(const char *buf, size_t len, size_t *line_len){
     const char *cr_ptr = (char *)memchr(buf, '\r', len);
     if(!cr_ptr) return NULL;
@@ -126,7 +128,7 @@ resp_status resp_parse(const char *buf, size_t len, size_t *consumed, resp_value
                 *consumed = header_bytes;
                 return RESP_OK;
             }
-            if (payload_len < -1 || payload_len > (512 * 1024 * 1024)) {
+            if (payload_len < 0 || payload_len > RESP_MAX_BULK_SIZE) {
                 free(*out);
                 *out = NULL;
                 return RESP_PROTO_ERR;
