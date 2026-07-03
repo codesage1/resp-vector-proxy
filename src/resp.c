@@ -262,62 +262,61 @@ void resp_free(resp_value *v){
     free(v);
 }
 
-static void writer_append(resp_writer *w, const char *data, size_t len) {
+static int writer_append(resp_writer *w, const char *data, size_t len) {
     if (w->len + len > w->cap) {
         w->cap = (w->cap == 0) ? 64 : w->cap;
         while (w->len + len > w->cap) w->cap *= 2;
         void* temp = realloc(w->buf, w->cap);
         if (!temp) {
-            // Handle memory allocation failure
-            fprintf(stderr, "Memory allocation failed in writer_append\n");
-            exit(EXIT_FAILURE);
+            return RESP_PROTO_ERR; // or handle as needed
         }
         w->buf = temp;
     }
     memcpy(w->buf + w->len, data, len);
     w->len += len;
+    return RESP_OK;
 }
 
 
 int resp_write_simple(resp_writer *w, const char *s) {
-    writer_append(w, "+", 1);
-    writer_append(w, s, strlen(s));
-    writer_append(w, "\r\n", 2);
+    if(writer_append(w, "+", 1) != RESP_OK) return RESP_PROTO_ERR;
+    if(writer_append(w, s, strlen(s)) != RESP_OK) return RESP_PROTO_ERR;
+    if(writer_append(w, "\r\n", 2) != RESP_OK) return RESP_PROTO_ERR;
     return RESP_OK;
 }
 
 int resp_write_error(resp_writer *w, const char *msg) {
-    writer_append(w, "-", 1);
-    writer_append(w, msg, strlen(msg));
-    writer_append(w, "\r\n", 2);
+    if(writer_append(w, "-", 1) != RESP_OK) return RESP_PROTO_ERR;
+    if(writer_append(w, msg, strlen(msg)) != RESP_OK) return RESP_PROTO_ERR;
+    if(writer_append(w, "\r\n", 2) != RESP_OK) return RESP_PROTO_ERR;
     return RESP_OK;
 }
 
 int resp_write_integer(resp_writer *w, long long v) {
     char buf[64];
     int len = snprintf(buf, sizeof(buf), ":%lld\r\n", v);
-    writer_append(w, buf, len);
+    if(writer_append(w, buf, len) != RESP_OK) return RESP_PROTO_ERR;
     return RESP_OK;
 }
 
 int resp_write_null(resp_writer *w) {
-    writer_append(w, "$-1\r\n", 5);
+    if(writer_append(w, "$-1\r\n", 5) != RESP_OK) return RESP_PROTO_ERR;
     return RESP_OK;
 }
 
 int resp_write_bulk(resp_writer *w, const char *data, size_t len) {
     char header[64];
     int len_header = snprintf(header, sizeof(header), "$%zu\r\n", len);
-    writer_append(w, header, len_header);
-    writer_append(w, data, len);
-    writer_append(w, "\r\n", 2);
+    if(writer_append(w, header, len_header) != RESP_OK) return RESP_PROTO_ERR;
+    if(writer_append(w, data, len) != RESP_OK) return RESP_PROTO_ERR;
+    if(writer_append(w, "\r\n", 2) != RESP_OK) return RESP_PROTO_ERR;
     return RESP_OK;
 }
 
 int resp_write_array_header(resp_writer *w, size_t n) {
     char header[64];
     int len_header = snprintf(header, sizeof(header), "*%zu\r\n", n);
-    writer_append(w, header, len_header);
+    if(writer_append(w, header, len_header) != RESP_OK) return RESP_PROTO_ERR;
     return RESP_OK;
 }
 
