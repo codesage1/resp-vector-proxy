@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <poll.h>
 
 // acting as a TCP proxy between a client and an upstream server
 int tcp_connect(const char *host, int port){
@@ -123,19 +124,42 @@ int proxy_run(int listen_port, const char *up_host, int up_port) {
 
         size_t client_to_upstream = 0;
         size_t upstream_to_client = 0;
-        // Read from client...
-        while ((bytes_read = read(client_fd, buffer, sizeof(buffer))) > 0) {
-            client_to_upstream += (size_t)bytes_read;
-            // Write to upstream...
-            if (write_all(up_fd, buffer, bytes_read) == -1) break;
+        
+        struct pollfd fds[2];
 
-            // Read from upstream...
-            ssize_t up_bytes = read(up_fd, buffer, sizeof(buffer));
-            if (up_bytes <= 0) break;
+        //watching client_fd and up_fd for incoming data
+        fds[0].fd = client_fd;
+        fds[0].events = POLLIN;
 
-            // Write back to client...
-            if (write_all(client_fd, buffer, up_bytes) == -1) break;
-            upstream_to_client += (size_t)up_bytes;
+        fds[1].fd = up_fd;
+        fds[1].events = POLLIN;
+
+        while(1){
+            //asking OS to wait
+            int ready = poll(fds, 2, -1);
+            if(ready == -1){
+                perror("poll failed");
+                break;
+            }
+
+            if(fds[0].revents & POLLIN){
+                bytes_read = read(client_fd, buffer, sizeof(buffer));
+                if(bytes_read <= 0) break; // client closed connection
+                client_to_upstream += (size_t)bytes_read;
+                if(write_all(up_fd, buffer, bytes_read) == -1) break;
+            }
+
+            if(fds[1].revents & POLLIN){
+                bytes_read = read(up_fd, buffer, sizeof(buffer));
+                if(bytes_read <= 0) break; // upstream closed connection
+                upstream_to_client += (size_t)bytes_read;
+                if(write_all(client_fd, buffer, bytes_read) == -1) break;
+            }
+
+            // --- Check for broken connections (POLLERR or POLLHUP)
+            if ((fds[0].revents & (POLLERR | POLLHUP)) || (fds[1].revents & (POLLERR | POLLHUP))) {
+            break; // Someone forcefully closed the connection
+            }
         }
         printf("conn closed: client→upstream %zu bytes, upstream→client %zu bytes.\n", client_to_upstream, upstream_to_client);
         close(up_fd);
