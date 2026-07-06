@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <poll.h>
+#include <errno.h>
 
 // acting as a TCP proxy between a client and an upstream server
 int tcp_connect(const char *host, int port){
@@ -82,8 +83,6 @@ int tcp_listen(int port){
         perror("listen failed");
         exit(1);
     }
-
-    // int new_fd = accept(server_fd, )
     freeaddrinfo(res);
 
     return server_fd;
@@ -105,7 +104,6 @@ int write_all(int fd, const char *buf,size_t size){
 int proxy_run(int listen_port, const char *up_host, int up_port) {
 
     int listen_fd = tcp_listen(listen_port);
-    printf("Server listening on port %d...\n", listen_port);
 
     // 2. The Infinite Server Loop
     while (1) {
@@ -138,7 +136,7 @@ int proxy_run(int listen_port, const char *up_host, int up_port) {
             //asking OS to wait
             int ready = poll(fds, 2, -1);
             if(ready == -1){
-                perror("poll failed");
+                if (errno == EINTR) continue; // <-- F2 FIX: Recoverable signal interruption
                 break;
             }
 
@@ -161,7 +159,9 @@ int proxy_run(int listen_port, const char *up_host, int up_port) {
             break; // Someone forcefully closed the connection
             }
         }
+
         printf("conn closed: client→upstream %zu bytes, upstream→client %zu bytes.\n", client_to_upstream, upstream_to_client);
+        fflush(stdout); // Force the block-buffered text to print
         close(up_fd);
         close(client_fd);
     }
