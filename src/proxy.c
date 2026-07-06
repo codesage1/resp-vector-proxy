@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 
+// acting as a TCP proxy between a client and an upstream server
 int tcp_connect(const char *host, int port){
     int sockfd;
     struct addrinfo hints, *res;
@@ -40,6 +41,7 @@ int tcp_connect(const char *host, int port){
     return sockfd;
 }
 
+//acting as a TCP server listening for incoming client connections
 int tcp_listen(int port){
     int server_fd;
     int yes = 1;
