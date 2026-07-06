@@ -8,6 +8,7 @@
 #include <poll.h>
 #include <errno.h>
 #include "resp.h"
+#include "inspect.h"
 
 // acting as a TCP proxy between a client and an upstream server
 int tcp_connect(const char *host, int port){
@@ -158,6 +159,19 @@ int proxy_run(int listen_port, const char *up_host, int up_port) {
                         resp_status status = resp_parse(buffer + parsed_offset, total_bytes - parsed_offset,&consumed,&cmd);
                         if (status == RESP_OK) {
                             // Successfully parsed a command
+                            if (cmd->type == RESP_ARRAY && cmd->as.array.n > 0){                                
+                                resp_value *first_item = cmd -> as.array.items[0];
+                                if (first_item->type == RESP_BULK){
+                                    char* cmd_name = first_item -> as.str.data;
+                                    size_t cmd_len = first_item -> as.str.len;
+        
+                                    printf("[Proxy] Seen command: %.*s\n", (int)cmd_len, cmd_name);
+                                    if(is_ft_search(cmd) == 1){
+                                        printf("🚨 INTERCEPTED FT.SEARCH!\n");
+                                    }
+                                }
+                            }
+                            
                             write_all(up_fd, buffer + parsed_offset, consumed); // Forward the command to upstream
                             resp_free(cmd); // Free the parsed command after inspection
                         } else if (status == RESP_NEED_MORE) {
@@ -190,6 +204,8 @@ int proxy_run(int listen_port, const char *up_host, int up_port) {
                     memmove(buffer, buffer + parsed_offset, total_bytes - parsed_offset);
                 }
                 total_bytes -= parsed_offset; // Update total_bytes to reflect unprocessed data
+
+
             }
 
             if(fds[1].revents & POLLIN){
