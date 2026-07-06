@@ -9,6 +9,7 @@ BIN_DIR = bin
 
 # Individual Object Files
 RESP_OBJ = $(OBJ_DIR)/resp.o
+PROXY_OBJ = $(OBJ_DIR)/proxy.o
 MAIN_OBJ = $(OBJ_DIR)/main.o
 TEST_OBJ = $(OBJ_DIR)/test_resp.o
 
@@ -19,7 +20,7 @@ TEST_BIN = $(BIN_DIR)/test_resp
 all: dirs $(PROXY_BIN) $(TEST_BIN)
 
 # Link the Proxy
-$(PROXY_BIN): $(MAIN_OBJ) $(RESP_OBJ)
+$(PROXY_BIN): $(MAIN_OBJ) $(RESP_OBJ) $(PROXY_OBJ)
 	$(CC) $(CFLAGS) -o $@ $^
 
 # Link the Test Suite
