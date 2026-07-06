@@ -7,6 +7,7 @@
 #include <netdb.h>
 #include <poll.h>
 #include <errno.h>
+#include "resp.h"
 
 // acting as a TCP proxy between a client and an upstream server
 int tcp_connect(const char *host, int port){
@@ -118,11 +119,13 @@ int proxy_run(int listen_port, const char *up_host, int up_port) {
         }
 
         char buffer[8192];
+        char up_buffer[8192];
         ssize_t bytes_read;
 
         size_t client_to_upstream = 0;
         size_t upstream_to_client = 0;
         
+        size_t total_bytes = 0;
         struct pollfd fds[2];
 
         //watching client_fd and up_fd for incoming data
@@ -141,17 +144,59 @@ int proxy_run(int listen_port, const char *up_host, int up_port) {
             }
 
             if(fds[0].revents & POLLIN){
-                bytes_read = read(client_fd, buffer, sizeof(buffer));
+                bytes_read = read(client_fd, buffer + total_bytes, sizeof(buffer) - total_bytes);
                 if(bytes_read <= 0) break; // client closed connection
+                total_bytes += (size_t)bytes_read;
                 client_to_upstream += (size_t)bytes_read;
-                if(write_all(up_fd, buffer, bytes_read) == -1) break;
+
+                size_t parsed_offset = 0;
+                int disable_parser = 0;
+                while(parsed_offset < total_bytes) {
+                    resp_value *cmd = NULL;
+                    size_t consumed = 0;
+                    if (!disable_parser) {
+                        resp_status status = resp_parse(buffer + parsed_offset, total_bytes - parsed_offset,&consumed,&cmd);
+                        if (status == RESP_OK) {
+                            // Successfully parsed a command
+                            write_all(up_fd, buffer + parsed_offset, consumed); // Forward the command to upstream
+                            resp_free(cmd); // Free the parsed command after inspection
+                        } else if (status == RESP_NEED_MORE) {
+                            // Not enough data to parse a complete command
+                            break;
+                        } else {
+                            // Parsing error occurred
+                            disable_parser = 1; // Disable further parsing on error
+                            break;
+                        }
+                    } else {
+                        consumed = total_bytes - parsed_offset; // If parser is disabled, consume all
+                    }
+
+                    if (consumed == 0) {
+                        disable_parser = 1; // Disable further parsing if no progress is made
+                        break;
+                    }
+
+                    parsed_offset += consumed;
+                }
+                if(disable_parser) {
+                    // If parser is disabled, forward all remaining data to upstream
+                    write_all(up_fd, buffer + parsed_offset, total_bytes - parsed_offset);
+                    parsed_offset = total_bytes; // All data has been forwarded
+                }
+
+                if(parsed_offset > 0 && parsed_offset < total_bytes) {
+                    // Move unprocessed data to the beginning of the buffer
+                    memmove(buffer, buffer + parsed_offset, total_bytes - parsed_offset);
+                }
+                total_bytes -= parsed_offset; // Update total_bytes to reflect unprocessed data
             }
 
             if(fds[1].revents & POLLIN){
-                bytes_read = read(up_fd, buffer, sizeof(buffer));
+                bytes_read = read(up_fd, up_buffer + total_bytes, sizeof(up_buffer) - total_bytes);
                 if(bytes_read <= 0) break; // upstream closed connection
                 upstream_to_client += (size_t)bytes_read;
-                if(write_all(client_fd, buffer, bytes_read) == -1) break;
+                if(write_all(client_fd, up_buffer, bytes_read) == -1) break;
             }
 
             // --- Check for broken connections (POLLERR or POLLHUP)

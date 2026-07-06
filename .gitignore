@@ -6,4 +6,5 @@ bin/
 .DS_Store
 
 # Debugging symbols (macOS creates these for dSYM bundles)
-*.dSYM/dump.rdb
+*.dSYM/
+*.rdb
