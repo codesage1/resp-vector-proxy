@@ -15,7 +15,7 @@ int  is_ft_search(const resp_value *cmd);   /* 1 iff argv[0] == FT.SEARCH, any c
 /* 0 = FT.SEARCH with a well-formed KNN clause, out is filled
  * 1 = FT.SEARCH but not KNN-shaped (plain text search etc.) — not ours
  * -1 = FT.SEARCH, KNN-shaped, but malformed (e.g. PARAMS missing the named param) */
-int  knn_parse(const resp_value *cmd, knn_query *out);
+int knn_parse(const resp_value *cmd, const char **out_param_name, size_t *out_param_len, const char **out_vec_data, size_t *out_vec_len);
 
 void knn_free_fields(knn_query *q);
 void knn_log(const knn_query *q);   /* one line: index, k, field, param,

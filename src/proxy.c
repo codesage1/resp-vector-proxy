@@ -167,7 +167,24 @@ int proxy_run(int listen_port, const char *up_host, int up_port) {
         
                                     printf("[Proxy] Seen command: %.*s\n", (int)cmd_len, cmd_name);
                                     if(is_ft_search(cmd) == 1){
-                                        printf("🚨 INTERCEPTED FT.SEARCH!\n");
+                                        // 1. Prepare the pointers to receive the extracted data
+                                        const char *param_name = NULL;
+                                        size_t param_len = 0;
+                                        const char *vec_data = NULL;
+                                        size_t vec_len = 0;
+
+                                        // 2. Run the Deep Packet Inspection
+                                        int rc = knn_parse(cmd, &param_name, &param_len, &vec_data, &vec_len);
+
+                                        // 3. Act on the intelligence
+                                        if (rc == 0) {
+                                            printf("INTERCEPTED KNN! Variable: '%.*s' | Blob length: %zu bytes\n", 
+                                                (int)param_len, param_name, vec_len);
+                                        } else if (rc == -1) {
+                                            printf("MALFORMED KNN DETECTED! Fail-Open active. Forwarding to Redis...\n");
+                                        } else {
+                                            printf("Plain-text FT.SEARCH detected. No vectors found.\n");
+                                        }
                                     }
                                 }
                             }
