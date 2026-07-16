@@ -1,7 +1,5 @@
 #include "inspect.h"
 #include <string.h>
-int is_ft_search(const resp_value *cmd);
-int is_knn(const resp_value *cmd);
 
 int is_ft_search(const resp_value *cmd){
     if(cmd->type == RESP_ARRAY && cmd->as.array.n > 0){
@@ -14,7 +12,6 @@ int is_ft_search(const resp_value *cmd){
         size_t cmd_len = first_item -> as.str.len;
 
         if(cmd_len == 9 && strncasecmp(cmd_name,"FT.SEARCH",9) == 0){
-            is_knn(cmd);
             return 1;
         }
     }
@@ -25,7 +22,7 @@ int is_ft_search(const resp_value *cmd){
 int knn_parse(const resp_value *cmd, const char **out_param_name, size_t *out_param_len, const char **out_vec_data, size_t *out_vec_len) {
     if (cmd->type != RESP_ARRAY || cmd->as.array.n < 3) return 1; 
 
-    resp_value *query = cmd->as.array.items[2];
+    resp_value *query = cmd->as.array.items[2]; // items[2] is the query string, e.g., "*=>[KNN 10 @v $vec]"
     if (query->type != RESP_BULK) return 1;
 
     char *q_data = query->as.str.data;
